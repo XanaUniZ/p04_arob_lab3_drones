@@ -110,11 +110,8 @@ void DroneRace::generateTrajectory_() {
     //constants
     const int dimension = 3; //we only compute the trajectory in x, y and z
     const int derivative_to_optimize = mav_trajectory_generation::derivative_order::SNAP; //POSITION, VELOCITY, ACCELERATION, JERK, SNAP
-    double max_acc = 3;
-    double min_acc = 0.25;
     double max_vel = 3;
     double min_vel = 0.25;
-    double acc = 1.25;
     double vel = 0.85;
     mav_trajectory_generation::Vertex::Vector vertices;
     
@@ -124,7 +121,6 @@ void DroneRace::generateTrajectory_() {
     vertices.push_back(start);
     // Provide the time constraints on the vertices
     Eigen::Matrix<double, 3, 1> v_gate;
-    Eigen::Matrix<double, 3, 1> a_gate;
     Eigen::Matrix<double, 3, 1> vel_gate_frame;
 
 
@@ -140,16 +136,13 @@ void DroneRace::generateTrajectory_() {
         Eigen::Matrix<double, 3, 1> distance_vec = (pos_next_gate - pos_gate);
 
         vel = std::max(min_vel, std::min(distance_vec.norm()*0.95, max_vel));
-        acc = std::max(min_acc, std::min(distance_vec.norm()*0.95, max_acc));
 
         vel_gate_frame << vel, 0.0, 0.0;
         v_gate = rotate_gate * vel_gate_frame;
-        a_gate = distance_vec.normalized() * acc;
 
         mav_trajectory_generation::Vertex middle(dimension);
         middle.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(gate.position.x,gate.position.y,gate.position.z));
         middle.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(v_gate[0],v_gate[1],v_gate[2]));
-        middle.addConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, Eigen::Vector3d(a_gate[0],a_gate[1],a_gate[2]));
 
         vertices.push_back(middle);
     }
