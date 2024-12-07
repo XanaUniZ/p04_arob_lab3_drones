@@ -313,7 +313,7 @@ void DroneRace::generateTrajectory_() {
 
     //AROB visualization
     drawTrajectoryMarkers_();
-    ROS_INFO("Generating trajectory commands.");
+    ROS_INFO("Generating trajectorys commands.");
 
     //Including in the list the PoseStamped and the Twist Messages
     // for (const auto& state : states) {
