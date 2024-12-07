@@ -16,8 +16,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/Odometry.h>
-#include <tf/tf.h>
-#include <angles/angles.h>  
+
 
 #include <mav_trajectory_generation/polynomial_optimization_linear.h>
 #include <mav_trajectory_generation/trajectory_sampling.h>
