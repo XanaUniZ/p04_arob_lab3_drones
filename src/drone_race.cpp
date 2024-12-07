@@ -171,22 +171,32 @@ void DroneRace::calculateMetrics() {
         velocity_errors.push_back(velocity_error);
         
 
-        ROS_INFO("Ground Truth Quaternion: x=%f, y=%f, z=%f, w=%f", 
-         gt_poses[i].pose.pose.orientation.x, 
-         gt_poses[i].pose.pose.orientation.y, 
-         gt_poses[i].pose.pose.orientation.z, 
-         gt_poses[i].pose.pose.orientation.w);
+        // Extract the ground truth orientation as a quaternion
+        geometry_msgs::Quaternion gt_orientation = gt_poses[i].pose.pose.orientation;
 
-        ROS_INFO("Goal Quaternion: x=%f, y=%f, z=%f, w=%f", 
-                goal_list_[index].pose.orientation.x, 
-                goal_list_[index].pose.orientation.y, 
-                goal_list_[index].pose.orientation.z, 
-                goal_list_[index].pose.orientation.w);
+        // Convert the quaternion to a tf2::Quaternion
+        tf2::Quaternion q_gt;
+        tf2::fromMsg(gt_orientation, q_gt);
 
-        // Compute angular error (yaw difference) - > Now in world frame
-        double gt_yaw = getYawFromQuaternion(gt_poses[i].pose.pose.orientation);
-        double goal_yaw = getYawFromQuaternion(goal_list_[index].pose.orientation);
+        // Transform the ground truth velocity to the robot's frame
+        tf2::Vector3 gt_velocity_world(gt_poses[i].twist.twist.linear.x, 
+                                    gt_poses[i].twist.twist.linear.y, 
+                                    gt_poses[i].twist.twist.linear.z);
+        tf2::Vector3 gt_velocity_body = tf2::quatRotate(q_gt.inverse(), gt_velocity_world);
+
+        // Transform the goal velocity to the robot's frame
+        geometry_msgs::Twist goal_velocity = goal_vel_list_[index];
+        tf2::Vector3 goal_velocity_world(goal_velocity.linear.x, 
+                                        goal_velocity.linear.y, 
+                                        goal_velocity.linear.z);
+        tf2::Vector3 goal_velocity_body = tf2::quatRotate(q_gt.inverse(), goal_velocity_world);
+
+        // Compute the yaw angles in the robot frame
+        double gt_yaw = atan2(gt_velocity_body.y(), gt_velocity_body.x());
+        double goal_yaw = atan2(goal_velocity_body.y(), goal_velocity_body.x());
+
         double angular_error = gt_yaw - goal_yaw;
+        
         if (std::isnan(gt_yaw) || std::isnan(goal_yaw)) {
             ROS_WARN("Yaw computation resulted in NaN.");
         }
@@ -316,48 +326,20 @@ void DroneRace::generateTrajectory_() {
     ROS_INFO("Generating trajectory commands.");
 
     //Including in the list the PoseStamped and the Twist Messages
-    // for (const auto& state : states) {
-    //     goal_.header.frame_id = "world";
-    //     goal_.header.stamp = ros::Time::now();
-    //     goal_.pose.position.x = state.position_W.x();
-    //     goal_.pose.position.y = state.position_W.y();
-    //     goal_.pose.position.z = state.position_W.z();
-    //     goal_list_.push_back(goal_); 
-
-    //     goal_vel_.linear.x = state.velocity_W.x();
-    //     goal_vel_.linear.y = state.velocity_W.y();
-    //     goal_vel_.linear.z = state.velocity_W.z();
-    //     goal_vel_list_.push_back(goal_vel_);
-    // }
-
-    for (size_t i = 0; i < states.size(); ++i) {
+    for (const auto& state : states) {
         goal_.header.frame_id = "world";
         goal_.header.stamp = ros::Time::now();
-        goal_.pose.position.x = states[i].position_W.x();
-        goal_.pose.position.y = states[i].position_W.y();
-        goal_.pose.position.z = states[i].position_W.z();
+        goal_.pose.position.x = state.position_W.x();
+        goal_.pose.position.y = state.position_W.y();
+        goal_.pose.position.z = state.position_W.z();
+        goal_list_.push_back(goal_); 
 
-        // Compute orientation based on the direction vector
-        double yaw = 0.0;
-        if (i < states.size() - 1) {
-            Eigen::Vector3d direction = states[i + 1].position_W - states[i].position_W;
-            yaw = atan2(direction.y(), direction.x());
-        } else if (states.size() > 1) {
-            // Direciton previous waypoint ( i -1  )
-            Eigen::Vector3d direction = states[i].position_W - states[i - 1].position_W;
-            yaw = atan2(direction.y(), direction.x());
-        }
-
-        // Convert yaw to quaternion and assign orientation
-        goal_.pose.orientation = RPYToQuat_(0, 0, yaw);
-
-        goal_list_.push_back(goal_);
-
-        goal_vel_.linear.x = states[i].velocity_W.x();
-        goal_vel_.linear.y = states[i].velocity_W.y();
-        goal_vel_.linear.z = states[i].velocity_W.z();
+        goal_vel_.linear.x = state.velocity_W.x();
+        goal_vel_.linear.y = state.velocity_W.y();
+        goal_vel_.linear.z = state.velocity_W.z();
         goal_vel_list_.push_back(goal_vel_);
     }
+
 }
 
 Eigen::Matrix<double, 3, 3> DroneRace::RPYtoRMatrix_(double roll, double pitch, double yaw) {
