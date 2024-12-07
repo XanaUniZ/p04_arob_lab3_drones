@@ -1,0 +1,18 @@
+<launch>
+
+    <!-- Gazebo simulation  -->
+    <!-- <include file="$(find hector_quadrotor_gazebo)/launch/quadrotor_empty_world.launch" /> -->
+
+    <!-- Show in Rviz   -->
+	<!-- <node name="rviz" pkg="rviz" type="rviz" args="-d (find lab3_drones)/cfg/arob_lab3.rviz"/> -->
+	<node name="rviz" pkg="rviz" type="rviz" args="-d /home/arob/catkin_ws/src/p04_arob_lab3_drones/cfg/arob_lab3.rviz"/>
+
+    <!-- Trajectory node   -->
+    <node pkg="lab3_drones" type="drone_race" name="drone_race" output="screen"> 
+
+        <param name="targets_file_path"           value="/home/arob/catkin_ws/src/p04_arob_lab3_drones/data/gates_hard.txt"/>
+
+    </node>
+
+    
+</launch>
