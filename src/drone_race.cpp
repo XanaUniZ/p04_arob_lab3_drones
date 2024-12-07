@@ -19,8 +19,8 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
         ros::shutdown();
         return;
     }
+    drone_finished = false;
     current_goal_idx_ = 0;
-
     // This variable will control if we are in pose or cmd_vel control mode
     is_pose_control_ = true;
 
@@ -35,11 +35,13 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     pub_gate_markers_ =
         nh_.advertise<visualization_msgs::MarkerArray>("/gate_markers", 1000);
 
+    pose_sub = nh_.subscribe("/ground_truth/state", 1000, &DroneRace::dronePoseLogger, this);
+
     ros::Duration sleeptime(1.0);
     sleeptime.sleep(); // Sleep for a moment before trying to draw
 
     drawGates_();
-    //generateTrajectoryExample_();
+    //dronePoseLogger();
     generateTrajectory_();
     cmd_timer_ = nh_.createTimer(ros::Duration(0.01), &DroneRace::commandTimerCallback_, this);
     ROS_INFO("DroneRace initialized");
@@ -85,6 +87,10 @@ void DroneRace::commandTimerCallback_(const ros::TimerEvent& event) {
             ros::Duration elapsed_time = ros::Time::now() - start_time_;
             ROS_INFO("Trajectory execution took %f seconds", elapsed_time.toSec());
             timer_started_ = false; // Reset the timer for future runs
+            drone_finished = true;
+
+            // Calculate Metrics function
+            calculateMetrics();
         }
 
         ros::shutdown(); // End the program
@@ -105,6 +111,99 @@ void DroneRace::commandTimerCallback_(const ros::TimerEvent& event) {
     }
     current_goal_idx_++;
 }
+
+
+void DroneRace::dronePoseLogger(const nav_msgs::Odometry& odom_msg){
+    if (!drone_finished) {
+        gt_poses.push_back(odom_msg);
+    }
+}
+
+
+void DroneRace::calculateMetrics() {
+
+    if (gt_poses.empty()) {
+        ROS_WARN("Ground truth is empty. Cannot compute metrics.");
+        return;
+    }
+    if (goal_list_.empty()) {
+        ROS_WARN("Goal list truth is empty");
+        return;
+    }
+
+    std::vector<double> lowest_distances, angular_errors, velocity_errors;
+    double lowest_dist = 100000; 
+    int index = 0;
+
+    // Iterate over gt_poses and goal_list_ assuming they are aligned
+    for (int i = 0; i < gt_poses.size(); i++) {
+        for(int j = 0; j < goal_list_.size() ; j++){
+        
+            // Compute Euclidean distance
+            double dist = sqrt(pow(gt_poses[i].pose.pose.position.x - goal_list_[j].pose.position.x, 2) +
+                               pow(gt_poses[i].pose.pose.position.y - goal_list_[j].pose.position.y, 2) +
+                               pow(gt_poses[i].pose.pose.position.z - goal_list_[j].pose.position.z, 2));
+
+            // Save lowest index and dist
+            if (dist < lowest_dist){
+                index = j; 
+                lowest_dist = dist; 
+            }
+        }
+
+        // Saving velocity and distance at same point.
+        lowest_distances.push_back(lowest_dist);
+
+        // Compute velocity error
+        double velocity_error = sqrt(pow(gt_poses[i].twist.twist.linear.x - goal_vel_list_[index].linear.x, 2) +
+                                     pow(gt_poses[i].twist.twist.linear.y - goal_vel_list_[index].linear.y, 2) +
+                                     pow(gt_poses[i].twist.twist.linear.z - goal_vel_list_[index].linear.z, 2));
+
+        velocity_errors.push_back(velocity_error);
+        
+        // Compute angular error (yaw difference)
+        double gt_yaw = atan2(gt_poses[i].twist.twist.linear.y, gt_poses[i].twist.twist.linear.x);
+        double goal_yaw = atan2(goal_vel_list_[index].linear.y, goal_vel_list_[index].linear.x);
+        double angular_error = gt_yaw - goal_yaw;
+        angular_error = atan2(sin(angular_error), cos(angular_error));
+        angular_errors.push_back(angular_error);
+    }
+
+    if (lowest_distances.empty() || angular_errors.empty() || velocity_errors.empty()) {
+        ROS_WARN("Error vectors are empty. Metrics cannot be computed.");
+        return;
+    }
+
+    double sum_distance = 0.0, sum_distance_squared = 0.0;
+    double sum_angular = 0.0, sum_angular_squared = 0.0;
+    double sum_velocity = 0.0, sum_velocity_squared = 0.0;
+
+
+    for(int i = 0; i < lowest_distances.size(); i++){
+        sum_distance += lowest_distances[i];
+        sum_distance_squared += lowest_distances[i] * lowest_distances[i];
+        sum_angular += angular_errors[i];
+        sum_angular_squared += angular_errors[i] * angular_errors[i];
+        sum_velocity += velocity_errors[i];
+        sum_velocity_squared += velocity_errors[i] * velocity_errors[i];
+    }
+
+    double mean_distance = sum_distance / lowest_distances.size();
+    double std_dev_distance = sqrt((sum_distance_squared / lowest_distances.size()) - (mean_distance * mean_distance));
+    double mean_angular = sum_angular / angular_errors.size();
+    double std_dev_angular = sqrt((sum_angular_squared / angular_errors.size()) - (mean_angular * mean_angular));
+    double mean_velocity = sum_velocity / velocity_errors.size();
+    double std_dev_velocity = sqrt((sum_velocity_squared / velocity_errors.size()) - (mean_velocity * mean_velocity));
+
+    // Print metrics
+    ROS_INFO("Distance Errors - Mean: %f, Std Dev: %f", mean_distance, std_dev_distance);
+    ROS_INFO("Angular Errors - Mean: %f, Std Dev: %f", mean_angular, std_dev_angular);
+    ROS_INFO("Velocity Errors - Mean: %f, Std Dev: %f", mean_velocity, std_dev_velocity);
+}
+
+
+
+
 
 void DroneRace::generateTrajectory_() {
     //constants
@@ -191,9 +290,6 @@ void DroneRace::generateTrajectory_() {
     drawTrajectoryMarkers_();
     ROS_INFO("Generating trajectory commands.");
 
-    // Generate list of commands to publish to the drone
-    // INCLUDE YOUR CODE HERE
-
     //Including in the list the PoseStamped and the Twist Messages
     for (const auto& state : states) {
         goal_.header.frame_id = "world";
@@ -213,64 +309,6 @@ void DroneRace::generateTrajectory_() {
 
 }
 
-
-
-
-void DroneRace::generateTrajectoryExample_() {
-    //constants
-    const int dimension = 3; //we only compute the trajectory in x, y and z
-    const int derivative_to_optimize = mav_trajectory_generation::derivative_order::SNAP; //POSITION, VELOCITY, ACCELERATION, JERK, SNAP
-
-    // Definition of the trajectory beginning, end and intermediate constraints
-    mav_trajectory_generation::Vertex::Vector vertices;
-    mav_trajectory_generation::Vertex start(dimension), middle(dimension), end(dimension);
-    start.makeStartOrEnd(Eigen::Vector3d(0,0,1), derivative_to_optimize);
-    vertices.push_back(start);
-
-    //Position constraint
-    middle.addConstraint(mav_trajectory_generation::derivative_order::POSITION, Eigen::Vector3d(1,2,3));
-    middle.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY, Eigen::Vector3d(1,0,0));
-    vertices.push_back(middle);
-    //Define the end point
-    end.makeStartOrEnd(Eigen::Vector3d(2,1,5), derivative_to_optimize);
-    vertices.push_back(end);
-    
-    // Provide the time constraints on the vertices
-    std::vector<double> segment_times;
-    const double v_max = 2.0;
-    const double a_max = 2.0;
-    // segment_times = estimateSegmentTimes(vertices, v_max, a_max);
-    segment_times = {2.0, 5.0};
-    cout << "Segment times = " << segment_times.size() << endl;
-    
-    // Solve the optimization problem
-    const int N = 10; //Degree of the polynomial, even number at least two times the highest derivative
-    mav_trajectory_generation::PolynomialOptimization<N> opt(dimension);
-    opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
-    opt.solveLinear();
-
-    //Obtain the trajectory
-    opt.getTrajectory(&trajectory_);
-    //Sample the trajectory (to obtain positions, velocities, etc.)
-    mav_msgs::EigenTrajectoryPoint::Vector states;
-    double sampling_interval = 0.01; //How much time between intermediate points
-    bool success = mav_trajectory_generation::sampleWholeTrajectory(trajectory_, sampling_interval, &states);
-    // Example to access the data
-    cout << "Trajectory time = " << trajectory_.getMaxTime() << endl;
-    cout << "Number of states = " << states.size() << endl;
-    cout << "Position (world frame) " << 3 << " X = " << states[2].position_W[0] << endl;
-    cout << "Velocity (world frame) " << 3 << " X = " << states[2].velocity_W[0] << endl;
-
-    // Default Visualization
-    visualization_msgs::MarkerArray markers;
-    double distance = 0.5; // Distance by which to seperate additional markers. Set 0.0 to disable.
-    std::string frame_id = "world";
-    mav_trajectory_generation::drawMavTrajectory(trajectory_, distance, frame_id, &markers);
-    pub_traj_vectors_.publish(markers);
-
-    //AROB visualization
-    drawTrajectoryMarkers_();
-}
 
 Eigen::Matrix<double, 3, 3> DroneRace::RPYtoRMatrix_(double roll, double pitch, double yaw) {
     Eigen::AngleAxis<double> rollAngle(roll, Eigen::Matrix<double, 1, 3>::UnitX());
