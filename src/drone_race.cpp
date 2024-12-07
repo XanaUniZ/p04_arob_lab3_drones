@@ -343,8 +343,8 @@ void DroneRace::generateTrajectory_() {
             Eigen::Vector3d direction = states[i + 1].position_W - states[i].position_W;
             yaw = atan2(direction.y(), direction.x());
         } else if (states.size() > 1) {
-            // Direciton previous waypoint ( i -1  )
-            Eigen::Vector3d direction = states[i].position_W - states[i - 1].position_W;
+            // If we are in the last one
+            Eigen::Vector3d direction = states[i].position_W - states[0].position_W;
             yaw = atan2(direction.y(), direction.x());
         }
 
