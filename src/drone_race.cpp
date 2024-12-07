@@ -119,6 +119,15 @@ void DroneRace::dronePoseLogger(const nav_msgs::Odometry& odom_msg){
     }
 }
 
+double DroneRace::getYawFromQuaternion(const geometry_msgs::Quaternion& quat) {
+    tf2::Quaternion q(quat.x, quat.y, quat.z, quat.w);
+    q.normalize();
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+
+    return yaw;
+}
 
 void DroneRace::calculateMetrics() {
 
@@ -161,10 +170,26 @@ void DroneRace::calculateMetrics() {
 
         velocity_errors.push_back(velocity_error);
         
-        // Compute angular error (yaw difference)
-        double gt_yaw = atan2(gt_poses[i].twist.twist.linear.y, gt_poses[i].twist.twist.linear.x);
-        double goal_yaw = atan2(goal_vel_list_[index].linear.y, goal_vel_list_[index].linear.x);
+
+        ROS_INFO("Ground Truth Quaternion: x=%f, y=%f, z=%f, w=%f", 
+         gt_poses[i].pose.pose.orientation.x, 
+         gt_poses[i].pose.pose.orientation.y, 
+         gt_poses[i].pose.pose.orientation.z, 
+         gt_poses[i].pose.pose.orientation.w);
+
+        ROS_INFO("Goal Quaternion: x=%f, y=%f, z=%f, w=%f", 
+                goal_list_[index].pose.orientation.x, 
+                goal_list_[index].pose.orientation.y, 
+                goal_list_[index].pose.orientation.z, 
+                goal_list_[index].pose.orientation.w);
+
+        // Compute angular error (yaw difference) - > Now in world frame
+        double gt_yaw = getYawFromQuaternion(gt_poses[i].pose.pose.orientation);
+        double goal_yaw = getYawFromQuaternion(goal_list_[index].pose.orientation);
         double angular_error = gt_yaw - goal_yaw;
+        if (std::isnan(gt_yaw) || std::isnan(goal_yaw)) {
+            ROS_WARN("Yaw computation resulted in NaN.");
+        }
         angular_error = atan2(sin(angular_error), cos(angular_error));
         angular_errors.push_back(angular_error);
     }
@@ -291,24 +316,49 @@ void DroneRace::generateTrajectory_() {
     ROS_INFO("Generating trajectory commands.");
 
     //Including in the list the PoseStamped and the Twist Messages
-    for (const auto& state : states) {
+    // for (const auto& state : states) {
+    //     goal_.header.frame_id = "world";
+    //     goal_.header.stamp = ros::Time::now();
+    //     goal_.pose.position.x = state.position_W.x();
+    //     goal_.pose.position.y = state.position_W.y();
+    //     goal_.pose.position.z = state.position_W.z();
+    //     goal_list_.push_back(goal_); 
+
+    //     goal_vel_.linear.x = state.velocity_W.x();
+    //     goal_vel_.linear.y = state.velocity_W.y();
+    //     goal_vel_.linear.z = state.velocity_W.z();
+    //     goal_vel_list_.push_back(goal_vel_);
+    // }
+
+    for (size_t i = 0; i < states.size(); ++i) {
         goal_.header.frame_id = "world";
         goal_.header.stamp = ros::Time::now();
-        goal_.pose.position.x = state.position_W.x();
-        goal_.pose.position.y = state.position_W.y();
-        goal_.pose.position.z = state.position_W.z();
-        goal_list_.push_back(goal_); 
+        goal_.pose.position.x = states[i].position_W.x();
+        goal_.pose.position.y = states[i].position_W.y();
+        goal_.pose.position.z = states[i].position_W.z();
 
-        goal_vel_.linear.x = state.velocity_W.x();
-        goal_vel_.linear.y = state.velocity_W.y();
-        goal_vel_.linear.z = state.velocity_W.z();
+        // Compute orientation based on the direction vector
+        double yaw = 0.0;
+        if (i < states.size() - 1) {
+            Eigen::Vector3d direction = states[i + 1].position_W - states[i].position_W;
+            yaw = atan2(direction.y(), direction.x());
+        } else if (states.size() > 1) {
+            // Direciton previous waypoint ( i -1  )
+            Eigen::Vector3d direction = states[i].position_W - states[i - 1].position_W;
+            yaw = atan2(direction.y(), direction.x());
+        }
+
+        // Convert yaw to quaternion and assign orientation
+        goal_.pose.orientation = RPYToQuat_(0, 0, yaw);
+
+        goal_list_.push_back(goal_);
+
+        goal_vel_.linear.x = states[i].velocity_W.x();
+        goal_vel_.linear.y = states[i].velocity_W.y();
+        goal_vel_.linear.z = states[i].velocity_W.z();
         goal_vel_list_.push_back(goal_vel_);
     }
-
-
-
 }
-
 
 Eigen::Matrix<double, 3, 3> DroneRace::RPYtoRMatrix_(double roll, double pitch, double yaw) {
     Eigen::AngleAxis<double> rollAngle(roll, Eigen::Matrix<double, 1, 3>::UnitX());

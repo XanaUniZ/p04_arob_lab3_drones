@@ -82,6 +82,7 @@ private:
     Eigen::Matrix<double, 3, 3> quatToRMatrix_(geometry_msgs::Quaternion q);
     geometry_msgs::Quaternion RPYToQuat_(double roll, double pitch, double yaw);
 
+    double getYawFromQuaternion(const geometry_msgs::Quaternion& quat);
     void dronePoseLogger(const nav_msgs::Odometry& odom_msg);
     void calculateMetrics();
     void drawGoalMarker_(mav_trajectory_generation::Vertex goal);
