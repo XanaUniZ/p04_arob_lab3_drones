@@ -6,6 +6,7 @@
 #include <stdio.h> 
 #include <math.h>
 #include <fstream>
+#include <vector>
 
 #include <eigen3/Eigen/Core>
 
@@ -14,6 +15,8 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <nav_msgs/Odometry.h>
+
 
 #include <mav_trajectory_generation/polynomial_optimization_linear.h>
 #include <mav_trajectory_generation/trajectory_sampling.h>
@@ -38,13 +41,18 @@ private:
     ros::Publisher pub_gate_markers_;
     ros::Publisher pub_goal_;
     ros::Publisher pub_cmd_vel_;
+    ros::Subscriber pose_sub;
 
     ros::Timer cmd_timer_;
     ros::Time start_time_;
     bool timer_started_;
+    bool drone_finished;
     // Mission description
     std::string targets_file_path_;
     std::vector<geometry_msgs::Pose> gates_;
+
+    // Poses 
+    std::vector<nav_msgs::Odometry> gt_poses;
 
     // Trajectory
     mav_trajectory_generation::Trajectory trajectory_;
@@ -65,8 +73,6 @@ private:
     int id_marker = 0;
 
     bool readGates_(std::string file_name);
-
-    void generateTrajectoryExample_(); 
     void generateTrajectory_();
 
     void commandTimerCallback_(const ros::TimerEvent& event);
@@ -76,6 +82,9 @@ private:
     Eigen::Matrix<double, 3, 3> quatToRMatrix_(geometry_msgs::Quaternion q);
     geometry_msgs::Quaternion RPYToQuat_(double roll, double pitch, double yaw);
 
+    double getYawFromQuaternion(const geometry_msgs::Quaternion& quat);
+    void dronePoseLogger(const nav_msgs::Odometry& odom_msg);
+    void calculateMetrics();
     void drawGoalMarker_(mav_trajectory_generation::Vertex goal);
     void drawGates_();
     void drawGateMarkers_(geometry_msgs::Pose gate, int &id);

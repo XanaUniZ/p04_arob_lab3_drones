@@ -60,7 +60,8 @@ Visualization Manager:
       Marker Topic: /gate_markers
       Name: MarkerArray
       Namespaces:
-        {}
+        corner: true
+        line: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -128,17 +129,17 @@ Visualization Manager:
       Marker Topic: /trajectory_markers
       Name: traj_markers
       Namespaces:
-        {}
+        point: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: false
+      Enabled: true
       Marker Topic: /trajectory_vectors
       Name: traj_vectors
       Namespaces:
         {}
       Queue Size: 100
-      Value: false
+      Value: true
     - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.10000000149011612
@@ -220,4 +221,4 @@ Window Geometry:
     collapsed: true
   Width: 1075
   X: 218
-  Y: 67
+  Y: 30
