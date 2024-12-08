@@ -171,22 +171,33 @@ void DroneRace::calculateMetrics() {
         velocity_errors.push_back(velocity_error);
         
 
-        ROS_INFO("Ground Truth Quaternion: x=%f, y=%f, z=%f, w=%f", 
-         gt_poses[i].pose.pose.orientation.x, 
-         gt_poses[i].pose.pose.orientation.y, 
-         gt_poses[i].pose.pose.orientation.z, 
-         gt_poses[i].pose.pose.orientation.w);
+        // Extract the ground truth orientation as a quaternion
+        geometry_msgs::Quaternion gt_orientation = gt_poses[i].pose.pose.orientation;
 
-        ROS_INFO("Goal Quaternion: x=%f, y=%f, z=%f, w=%f", 
-                goal_list_[index].pose.orientation.x, 
-                goal_list_[index].pose.orientation.y, 
-                goal_list_[index].pose.orientation.z, 
-                goal_list_[index].pose.orientation.w);
+        // Convert the quaternion to a tf2::Quaternion
+        tf2::Quaternion q_gt;
+        tf2::fromMsg(gt_orientation, q_gt);
+        q_gt.normalize();
 
-        // Compute angular error (yaw difference) - > Now in world frame
-        double gt_yaw = getYawFromQuaternion(gt_poses[i].pose.pose.orientation);
-        double goal_yaw = getYawFromQuaternion(goal_list_[index].pose.orientation);
+        // Transform the ground truth velocity to the robot's frame
+        tf2::Vector3 gt_velocity_world(gt_poses[i].twist.twist.linear.x, 
+                                    gt_poses[i].twist.twist.linear.y, 
+                                    gt_poses[i].twist.twist.linear.z);
+        tf2::Vector3 gt_velocity_body = tf2::quatRotate(q_gt.inverse(), gt_velocity_world);
+
+        // Transform the goal velocity to the robot's frame
+        geometry_msgs::Twist goal_velocity = goal_vel_list_[index];
+        tf2::Vector3 goal_velocity_world(goal_velocity.linear.x, 
+                                        goal_velocity.linear.y, 
+                                        goal_velocity.linear.z);
+        tf2::Vector3 goal_velocity_body = tf2::quatRotate(q_gt.inverse(), goal_velocity_world);
+
+        // Compute the yaw angles in the robot frame
+        double gt_yaw = atan2(gt_velocity_body.y(), gt_velocity_body.x());
+        double goal_yaw = atan2(goal_velocity_body.y(), goal_velocity_body.x());
+
         double angular_error = gt_yaw - goal_yaw;
+        
         if (std::isnan(gt_yaw) || std::isnan(goal_yaw)) {
             ROS_WARN("Yaw computation resulted in NaN.");
         }
@@ -568,14 +579,30 @@ void DroneRace::drawTrajectoryMarkers_(){
         marker_aux.header.stamp = ros::Time(0);
         marker_aux.id = 1000+i;
         marker_aux.ns = "point";
-        marker_aux.type = visualization_msgs::Marker::CUBE;
+        marker_aux.type = visualization_msgs::Marker::ARROW;
         marker_aux.pose.position.x = states[i].position_W[0] ;
         marker_aux.pose.position.y = states[i].position_W[1] ;
         marker_aux.pose.position.z = states[i].position_W[2] ;
-        marker_aux.pose.orientation.x = 0;
-        marker_aux.pose.orientation.y = 0;
-        marker_aux.pose.orientation.z = 0;
-        marker_aux.pose.orientation.w = 1;
+
+        // Extract the orientation of the robot in the world frame
+        Eigen::Quaterniond robot_orientation(states[i].orientation_W_B.x(),
+                                                states[i].orientation_W_B.y(),
+                                                states[i].orientation_W_B.z(),
+                                                states[i].orientation_W_B.w());
+        robot_orientation.normalize();
+
+        // Velocity in the world frame
+        Eigen::Vector3d velocity_W(states[i].velocity_W.x(),
+                                    states[i].velocity_W.y(),
+                                    states[i].velocity_W.z());
+
+        // Transform the velocity to the robot frame
+        Eigen::Vector3d velocity_R = robot_orientation.inverse() * velocity_W;
+
+        // Calculate the yaw based on the velocity in the robot frame
+        float yaw = atan2(-velocity_R.y(), -velocity_R.x());
+
+        marker_aux.pose.orientation = RPYToQuat_(0, 0, yaw);
         marker_aux.scale.x = 0.03;
         marker_aux.scale.y = 0.03;
         marker_aux.scale.z = 0.03;
@@ -583,6 +610,9 @@ void DroneRace::drawTrajectoryMarkers_(){
         marker_aux.color.g = 0.0f;
         marker_aux.color.b = 1.0f;
         marker_aux.color.a = 1.0;
+        marker_aux.scale.x = 0.75; // Length arrow
+        marker_aux.scale.y = 0.01; // Diameter cilinder
+        marker_aux.scale.z = 0.01; // Diameter head
         marker_aux.lifetime = ros::Duration();
         markers.markers.push_back(marker_aux);
     }
