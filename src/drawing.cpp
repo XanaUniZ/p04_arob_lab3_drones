@@ -147,14 +147,20 @@ void drawTrajectoryMarkers(const mav_trajectory_generation::Trajectory& trajecto
         marker_aux.pose.position.y = states[i].position_W[1] ;
         marker_aux.pose.position.z = states[i].position_W[2] ;
 
-        // Extract the orientation of the robot in the world frame
+        // // Extract the orientation of the robot in the world frame
         Eigen::Quaterniond robot_orientation(states[i].orientation_W_B.x(),
                                                 states[i].orientation_W_B.y(),
                                                 states[i].orientation_W_B.z(),
                                                 states[i].orientation_W_B.w());
         robot_orientation.normalize();
 
-        // Velocity in the world frame
+        // // No orientation enforced
+        // marker_aux.pose.orientation.x = states[i].orientation_W_B.x();
+        // marker_aux.pose.orientation.y = states[i].orientation_W_B.y();
+        // marker_aux.pose.orientation.z = states[i].orientation_W_B.z();
+        // marker_aux.pose.orientation.w = states[i].orientation_W_B.w();
+
+        // // Velocity orientation enforced
         Eigen::Vector3d velocity_W(states[i].velocity_W.x(),
                                     states[i].velocity_W.y(),
                                     states[i].velocity_W.z());
@@ -166,6 +172,7 @@ void drawTrajectoryMarkers(const mav_trajectory_generation::Trajectory& trajecto
         float yaw = atan2(-velocity_R.y(), -velocity_R.x());
 
         marker_aux.pose.orientation = RPYToQuat(0, 0, yaw);
+
         marker_aux.scale.x = 0.03;
         marker_aux.scale.y = 0.03;
         marker_aux.scale.z = 0.03;

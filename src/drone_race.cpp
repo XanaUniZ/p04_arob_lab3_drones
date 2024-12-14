@@ -206,7 +206,7 @@ void DroneRace::generateTrajectory_() {
     drawTrajectoryMarkers(trajectory_, pub_traj_markers_);
     ROS_INFO("Generating trajectorys commands.");
 
-    //Including in the list the PoseStamped and the Twist Messages
+    // // Including in the list the PoseStamped and the Twist Messages
     // for (const auto& state : states) {
     //     goal_.header.frame_id = "world";
     //     goal_.header.stamp = ros::Time::now();
