@@ -17,54 +17,56 @@ find_package(catkin REQUIRED COMPONENTS
 )
 find_package(Eigen3 REQUIRED)
 
+message(STATUS "Eigen3 found: ${EIGEN3_INCLUDE_DIR}")
+
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES
+  # LIBRARIES lab3_drawing
+  LIBRARIES lab3_drawing lab3_utils
   CATKIN_DEPENDS geometry_msgs nav_msgs visualization_msgs tf2 mav_trajectory_generation mav_trajectory_generation_ros
-  DEPENDS
+  DEPENDS Eigen3
 )
 
 ###########
 ## Build ##
 ###########
 
-# NOTE: Everytime catkin_SOMETHING gets called, catkin takes care of adding
-# dependencies, includes and links detected by the package manager. That is
-# why catkin is easier than pure cmake. catkin_SOMETHING is generated when
-# catkin_package() is called.
-
 ## Specify additional locations of header files
-## Your package locations should be listed before other locations
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
 )
 
-# NOTE: There are two options to add a .cpp into a executable node
-# We recommend option 2 but option 1 is better for larger projects.
+## Add library for utils.cpp
+add_library(lab3_utils
+    src/drones_utils.cpp
+)
+target_link_libraries(lab3_utils
+    ${catkin_LIBRARIES}
+    Eigen3::Eigen
+)
 
-# 1: Declare a C++ library containing parts of the code that
-# are more general and can be used in multiple executables (nodes)
-# add_library(${PROJECT_NAME}_lib
-#   src/follow_targets_3d_sol.cpp
-# )
-## And link catkin libraries against it
-# target_link_libraries(${PROJECT_NAME}_lib
-#   ${catkin_LIBRARIES}
-# )
-# Then you will have to target the executables against this library
+## Add library for drawing.cpp
+add_library(lab3_drawing
+    src/drawing.cpp
+)
+target_link_libraries(lab3_drawing
+    lab3_utils
+    ${catkin_LIBRARIES}
+)
 
-# 2: Declare a C++ executable and add all the source files to it
-# (RECOMMENDED FOR THIS LAB)
+## Add drone_race executable
 add_executable(drone_race
    src/drone_race.cpp
    src/drone_race_node.cpp
 )
 
 target_link_libraries(drone_race
-  ${catkin_LIBRARIES} 
+  lab3_drawing
+  lab3_utils
+  ${catkin_LIBRARIES}
   Eigen3::Eigen
-# ${PROJECT_NAME}_lib in case you chose option 1
 )
 
 #############
