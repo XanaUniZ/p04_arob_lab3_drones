@@ -213,6 +213,10 @@ void DroneRace::generateTrajectory_() {
     //     goal_.pose.position.x = state.position_W.x();
     //     goal_.pose.position.y = state.position_W.y();
     //     goal_.pose.position.z = state.position_W.z();
+    //     goal_.pose.orientation.x = 0.;
+    //     goal_.pose.orientation.y = 0.;
+    //     goal_.pose.orientation.z = 0.;
+    //     goal_.pose.orientation.w = 1.;
     //     goal_list_.push_back(goal_); 
 
     //     goal_vel_.linear.x = state.velocity_W.x();

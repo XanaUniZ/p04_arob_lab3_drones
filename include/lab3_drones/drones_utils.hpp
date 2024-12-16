@@ -20,4 +20,7 @@ void calculateMetrics(
     const std::vector<geometry_msgs::PoseStamped>& goal_list_,
     const std::vector<geometry_msgs::Twist>& goal_vel_list_);
 
+Eigen::Vector3d extractOrientationAsRPY(const geometry_msgs::PoseStamped& pose_stamped);
+double angularDistance(double angle1, double angle2);
+
 #endif // UTILS_HPP
