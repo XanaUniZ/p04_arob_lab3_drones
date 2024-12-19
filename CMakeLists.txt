@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   visualization_msgs
   tf2
+  tf2_ros
+  tf2_geometry_msgs
   mav_trajectory_generation
   mav_trajectory_generation_ros
 )

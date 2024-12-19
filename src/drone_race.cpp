@@ -42,6 +42,8 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     ros::Duration sleeptime(1.0);
     sleeptime.sleep(); // Sleep for a moment before trying to draw
 
+    //ros::Rate loop_rate(100); // 100 Hz en lugar de 50 Hz
+
     drawGates(gates_, pub_gate_markers_);
     //dronePoseLogger();
     generateTrajectory_();
@@ -206,15 +208,15 @@ void DroneRace::generateTrajectory_() {
     drawTrajectoryMarkers(trajectory_, pub_traj_markers_);
     ROS_INFO("Generating trajectorys commands.");
 
-    // // Including in the list the PoseStamped and the Twist Messages
+    // Including in the list the PoseStamped and the Twist Messages
     // for (const auto& state : states) {
     //     goal_.header.frame_id = "world";
     //     goal_.header.stamp = ros::Time::now();
     //     goal_.pose.position.x = state.position_W.x();
     //     goal_.pose.position.y = state.position_W.y();
     //     goal_.pose.position.z = state.position_W.z();
-    //     goal_.pose.orientation.x = 0.;
     //     goal_.pose.orientation.y = 0.;
+    //     goal_.pose.orientation.x = 0.;
     //     goal_.pose.orientation.z = 0.;
     //     goal_.pose.orientation.w = 1.;
     //     goal_list_.push_back(goal_); 
@@ -226,38 +228,31 @@ void DroneRace::generateTrajectory_() {
     // }
 
     for (size_t i = 0; i < states.size(); ++i) {
+        // Crear el PoseStamped en el frame 'world' directamente
         goal_.header.frame_id = "world";
         goal_.header.stamp = ros::Time::now();
+
+        // Asignar la posición de ground truth directamente desde states
         goal_.pose.position.x = states[i].position_W.x();
         goal_.pose.position.y = states[i].position_W.y();
         goal_.pose.position.z = states[i].position_W.z();
 
-        // Extract the orientation of the robot in the world frame
-        Eigen::Quaterniond robot_orientation(states[i].orientation_W_B.x(),
-                                                states[i].orientation_W_B.y(),
-                                                states[i].orientation_W_B.z(),
-                                                states[i].orientation_W_B.w());
-        robot_orientation.normalize();
+        // Calcular el yaw desde la velocidad en el frame 'world'
+        double yaw_from_vel = atan2(states[i].velocity_W.y(), states[i].velocity_W.x());
 
-        // Velocity in the world frame
-        Eigen::Vector3d velocity_W(states[i].velocity_W.x(),
-                                    states[i].velocity_W.y(),
-                                    states[i].velocity_W.z());
+        // Asignar la orientación calculada al goal_
+        goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
 
-        // Transform the velocity to the robot frame
-        Eigen::Vector3d velocity_R = robot_orientation.inverse() * velocity_W;
-
-        // Calculate the yaw based on the velocity in the robot frame
-        float yaw = atan2(-velocity_R.y(), -velocity_R.x());
-
-        // Convert yaw to quaternion and assign orientation
-        goal_.pose.orientation = RPYToQuat(0, 0, yaw);
-
+        // Añadir el goal a la lista
         goal_list_.push_back(goal_);
 
+        // Asignar las velocidades en el frame 'world'
         goal_vel_.linear.x = states[i].velocity_W.x();
         goal_vel_.linear.y = states[i].velocity_W.y();
         goal_vel_.linear.z = states[i].velocity_W.z();
         goal_vel_list_.push_back(goal_vel_);
+
+        
     }
+
 }

@@ -22,5 +22,6 @@ void calculateMetrics(
 
 Eigen::Vector3d extractOrientationAsRPY(const geometry_msgs::PoseStamped& pose_stamped);
 double angularDistance(double angle1, double angle2);
+double normalizeAngle(double angle);
 
 #endif // UTILS_HPP
