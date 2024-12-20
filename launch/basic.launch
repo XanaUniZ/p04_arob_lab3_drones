@@ -5,8 +5,6 @@
         <arg name="gui" value="false" />
     </include>
 
-    <!-- ODOM Hector -->
-    <node pkg="hector_pose_estimation" type="pose_estimation" name="pose_estimation" output="screen"/>
 
     <!-- Show in Rviz   -->
 	<!-- <node name="rviz" pkg="rviz" type="rviz" args="-d (find lab3_drones)/cfg/arob_lab3.rviz"/> -->

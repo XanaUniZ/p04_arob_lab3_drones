@@ -26,6 +26,8 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     // This variable will control if we are in pose or cmd_vel control mode
     is_pose_control_ = true;
 
+    use_orientation = true;
+
     pub_goal_ = nh_.advertise<geometry_msgs::PoseStamped>("/command/pose", 1000);
     pub_cmd_vel_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
@@ -92,9 +94,8 @@ void DroneRace::commandTimerCallback_(const ros::TimerEvent& event) {
             ROS_INFO("Trajectory execution took %f seconds", elapsed_time.toSec());
             timer_started_ = false; // Reset the timer for future runs
             drone_finished = true;
-
             // Calculate Metrics function
-            calculateMetrics(gt_poses, goal_list_, goal_vel_list_);
+            calculateMetrics(gt_poses, goal_list_, goal_vel_list_,use_orientation);
         }
 
         ros::shutdown(); // End the program
@@ -127,9 +128,9 @@ void DroneRace::generateTrajectory_() {
     //constants
     const int dimension = 3; //we only compute the trajectory in x, y and z
     const int derivative_to_optimize = mav_trajectory_generation::derivative_order::SNAP; //POSITION, VELOCITY, ACCELERATION, JERK, SNAP
-    double max_vel = 3;
+    double max_vel = 2.5;
     double min_vel = 0.25;
-    double vel = 0.85;
+    double vel = 0.55;
     mav_trajectory_generation::Vertex::Vector vertices;
     
     // INCLUDE YOUR CODE HERE
@@ -168,8 +169,8 @@ void DroneRace::generateTrajectory_() {
     vertices.push_back(end);
     std::vector<double> segment_times;
     // INCLUDE YOUR CODE HERE
-    const double v_max = 3;
-    const double a_max = 3;
+    const double v_max = 2.5;
+    const double a_max = 2.5;
     segment_times = estimateSegmentTimes(vertices, v_max, a_max);
 
     // Solve the optimization problem
@@ -209,50 +210,60 @@ void DroneRace::generateTrajectory_() {
     ROS_INFO("Generating trajectorys commands.");
 
     // Including in the list the PoseStamped and the Twist Messages
-    // for (const auto& state : states) {
-    //     goal_.header.frame_id = "world";
-    //     goal_.header.stamp = ros::Time::now();
-    //     goal_.pose.position.x = state.position_W.x();
-    //     goal_.pose.position.y = state.position_W.y();
-    //     goal_.pose.position.z = state.position_W.z();
-    //     goal_.pose.orientation.y = 0.;
-    //     goal_.pose.orientation.x = 0.;
-    //     goal_.pose.orientation.z = 0.;
-    //     goal_.pose.orientation.w = 1.;
-    //     goal_list_.push_back(goal_); 
 
-    //     goal_vel_.linear.x = state.velocity_W.x();
-    //     goal_vel_.linear.y = state.velocity_W.y();
-    //     goal_vel_.linear.z = state.velocity_W.z();
-    //     goal_vel_list_.push_back(goal_vel_);
-    // }
+    if(!use_orientation){
+        for (const auto& state : states) {
+            goal_.header.frame_id = "world";
+            goal_.header.stamp = ros::Time::now();
+            goal_.pose.position.x = state.position_W.x();
+            goal_.pose.position.y = state.position_W.y();
+            goal_.pose.position.z = state.position_W.z();
+            goal_.pose.orientation.y = 0.;
+            goal_.pose.orientation.x = 0.;
+            goal_.pose.orientation.z = 0.;
+            goal_.pose.orientation.w = 1.;
+            goal_list_.push_back(goal_); 
 
-    for (size_t i = 0; i < states.size(); ++i) {
-        // Crear el PoseStamped en el frame 'world' directamente
-        goal_.header.frame_id = "world";
-        goal_.header.stamp = ros::Time::now();
-
-        // Asignar la posición de ground truth directamente desde states
-        goal_.pose.position.x = states[i].position_W.x();
-        goal_.pose.position.y = states[i].position_W.y();
-        goal_.pose.position.z = states[i].position_W.z();
-
-        // Calcular el yaw desde la velocidad en el frame 'world'
-        double yaw_from_vel = atan2(states[i].velocity_W.y(), states[i].velocity_W.x());
-
-        // Asignar la orientación calculada al goal_
-        goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
-
-        // Añadir el goal a la lista
-        goal_list_.push_back(goal_);
-
-        // Asignar las velocidades en el frame 'world'
-        goal_vel_.linear.x = states[i].velocity_W.x();
-        goal_vel_.linear.y = states[i].velocity_W.y();
-        goal_vel_.linear.z = states[i].velocity_W.z();
-        goal_vel_list_.push_back(goal_vel_);
-
-        
+            goal_vel_.linear.x = state.velocity_W.x();
+            goal_vel_.linear.y = state.velocity_W.y();
+            goal_vel_.linear.z = state.velocity_W.z();
+            goal_vel_list_.push_back(goal_vel_);
+        }
     }
+    else{
+        for (size_t i = 0; i < states.size(); ++i) {
+            // Crear el PoseStamped en el frame 'world' directamente
+            goal_.header.frame_id = "world";
+            goal_.header.stamp = ros::Time::now();
 
+            // Asignar la posición de ground truth directamente desde states
+            goal_.pose.position.x = states[i].position_W.x();
+            goal_.pose.position.y = states[i].position_W.y();
+            goal_.pose.position.z = states[i].position_W.z();
+
+            // Calcular el yaw desde la velocidad en el frame 'world'
+            // double yaw_from_vel = atan2(states[i].velocity_W.y(), states[i].velocity_W.x());
+            const double epsilon = 1e-6;
+            if (fabs(states[i].velocity_W.x()) > epsilon || fabs(states[i].velocity_W.y()) > epsilon) {
+                double yaw_from_vel = atan2(states[i].velocity_W.y(), states[i].velocity_W.x());
+                goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
+            } else {
+                ROS_WARN("Velocity near zero at index %lu, setting goal_yaw to last valid yaw", i);
+                goal_.pose.orientation = goal_list_.empty() ? RPYToQuat(0, 0, 0) : goal_list_.back().pose.orientation;
+            }
+            goal_list_.push_back(goal_);
+
+            // Asignar la orientación calculada al goal_
+            //goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
+
+            // Añadir el goal a la lista
+            //goal_list_.push_back(goal_);
+
+            // Asignar las velocidades en el frame 'world'
+            goal_vel_.linear.x = states[i].velocity_W.x();
+            goal_vel_.linear.y = states[i].velocity_W.y();
+            goal_vel_.linear.z = states[i].velocity_W.z();
+            goal_vel_list_.push_back(goal_vel_);
+        }
+    }
 }

@@ -49,10 +49,10 @@ private:
     ros::Time start_time_;
     bool timer_started_;
     bool drone_finished;
+    bool use_orientation;
     // Mission description
     std::string targets_file_path_;
     std::vector<geometry_msgs::Pose> gates_;
-
     // Poses 
     std::vector<nav_msgs::Odometry> gt_poses;
 
@@ -65,7 +65,7 @@ private:
     std::vector<geometry_msgs::Twist> goal_vel_list_; // ADDED
     // Control
     int current_goal_idx_;
-    
+
     bool is_pose_control_; // Specifies if the control is in pose or vel
 
     geometry_msgs::PoseStamped goal_;
