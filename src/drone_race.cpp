@@ -26,7 +26,9 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     // This variable will control if we are in pose or cmd_vel control mode
     is_pose_control_ = true;
 
-    use_orientation = true;
+    // yaw_control = "no_control";
+    yaw_control = "yaw_2D_vel";
+    // yaw_control = "RPY_control";
 
     pub_goal_ = nh_.advertise<geometry_msgs::PoseStamped>("/command/pose", 1000);
     pub_cmd_vel_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
@@ -95,7 +97,7 @@ void DroneRace::commandTimerCallback_(const ros::TimerEvent& event) {
             timer_started_ = false; // Reset the timer for future runs
             drone_finished = true;
             // Calculate Metrics function
-            calculateMetrics(gt_poses, goal_list_, goal_vel_list_,use_orientation);
+            calculateMetrics(gt_poses, goal_list_, goal_vel_list_,yaw_control);
         }
 
         ros::shutdown(); // End the program
@@ -211,7 +213,7 @@ void DroneRace::generateTrajectory_() {
 
     // Including in the list the PoseStamped and the Twist Messages
 
-    if(!use_orientation){
+    if (yaw_control == "no_control"){
         for (const auto& state : states) {
             goal_.header.frame_id = "world";
             goal_.header.stamp = ros::Time::now();
@@ -230,7 +232,7 @@ void DroneRace::generateTrajectory_() {
             goal_vel_list_.push_back(goal_vel_);
         }
     }
-    else{
+    else if (yaw_control == "yaw_2D_vel"){
         for (size_t i = 0; i < states.size(); ++i) {
             // Crear el PoseStamped en el frame 'world' directamente
             goal_.header.frame_id = "world";
@@ -265,5 +267,8 @@ void DroneRace::generateTrajectory_() {
             goal_vel_.linear.z = states[i].velocity_W.z();
             goal_vel_list_.push_back(goal_vel_);
         }
+    }
+    else{
+        ROS_ERROR("Invalid yaw contol mode: %s Aborting!", yaw_control);
     }
 }

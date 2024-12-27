@@ -49,7 +49,7 @@ private:
     ros::Time start_time_;
     bool timer_started_;
     bool drone_finished;
-    bool use_orientation;
+    std::string yaw_control;
     // Mission description
     std::string targets_file_path_;
     std::vector<geometry_msgs::Pose> gates_;

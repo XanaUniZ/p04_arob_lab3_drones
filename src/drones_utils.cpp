@@ -44,7 +44,7 @@ void calculateMetrics(
     const std::vector<nav_msgs::Odometry>& gt_poses,
     const std::vector<geometry_msgs::PoseStamped>& goal_list_,
     const std::vector<geometry_msgs::Twist>& goal_vel_list_,
-    bool use_orientation)
+    std::string yaw_control)
 {
     if (gt_poses.empty()) {
         ROS_WARN("Ground truth is empty. Cannot compute metrics.");
@@ -58,7 +58,7 @@ void calculateMetrics(
     std::vector<double> lowest_distances, angular_errors, velocity_errors;
     const double epsilon = 1e-6;
 
-    ROS_INFO("Calculating Metrics (use_orientation: %s)...", use_orientation ? "true" : "false");
+    ROS_INFO("Calculating Metrics (use_orientation: %s)...", yaw_control);
     ROS_INFO("Ground Truth Size: %lu", gt_poses.size());
     ROS_INFO("Goal List Size: %lu", goal_list_.size());
 
@@ -95,18 +95,7 @@ void calculateMetrics(
         double goal_yaw = 0.0,goal_yaw_ori = 0.0, goal_yaw_no_ori = 0.0;
         static double last_valid_goal_yaw = 0.0;
 
-        if (use_orientation) {
-            goal_yaw_ori = tf2::getYaw(goal_list_[index].pose.orientation);
-
-
-            // Dan valores clavados así que esto chill
-            if(i == 0 || i == 100 || i == 500 || i == 1000 || i == 1500 || i == 2000){
-                ROS_INFO("Goal Yaw orientation : %.2f degrees", goal_yaw_ori * 180 / M_PI);
-                ROS_INFO("Goal Yaw velocities: %.2f degrees", goal_yaw_no_ori * 180 / M_PI);
-            }
-
-            goal_yaw = goal_yaw_ori;
-        } else {
+        if (yaw_control == "no_control"){
             // if (index + 1 < goal_list_.size()) {
             //     goal_yaw = atan2(
             //         goal_list_[index + 1].pose.position.y - goal_list_[index].pose.position.y,
@@ -119,9 +108,23 @@ void calculateMetrics(
             // }
             goal_yaw_no_ori = atan2(goal_vel_list_[index].linear.y, goal_vel_list_[index].linear.x);
             goal_yaw = goal_yaw_no_ori;
-
         }
-        
+        else if (yaw_control == "yaw_2D_vel"){
+            goal_yaw_ori = tf2::getYaw(goal_list_[index].pose.orientation);
+
+
+            // Dan valores clavados así que esto chill
+            if(i == 0 || i == 100 || i == 500 || i == 1000 || i == 1500 || i == 2000){
+                ROS_INFO("Goal Yaw orientation : %.2f degrees", goal_yaw_ori * 180 / M_PI);
+                ROS_INFO("Goal Yaw velocities: %.2f degrees", goal_yaw_no_ori * 180 / M_PI);
+            }
+
+            goal_yaw = goal_yaw_ori;
+        }
+        else{
+            ROS_ERROR("Invalid yaw contol mode: %s Aborting!", yaw_control);
+            return;
+        }        
 
         // Normalize yaws to the range [-π, π]
         gt_yaw = normalizeAngle(gt_yaw);
