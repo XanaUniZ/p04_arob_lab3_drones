@@ -27,4 +27,7 @@ Eigen::Vector3d extractOrientationAsRPY(const geometry_msgs::PoseStamped& pose_s
 double angularDistance(double angle1, double angle2);
 double normalizeAngle(double angle);
 
+void normalizeVector(double& x, double& y, double& z);
+geometry_msgs::Quaternion calculateQuaternionFromVector(double x, double y, double z);
+
 #endif // UTILS_HPP

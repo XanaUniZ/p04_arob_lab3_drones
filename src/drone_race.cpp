@@ -27,8 +27,8 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     is_pose_control_ = true;
 
     // yaw_control = "no_control";
-    yaw_control = "yaw_2D_vel";
-    // yaw_control = "RPY_control";
+    // yaw_control = "yaw_2D_vel";
+    yaw_control = "RPY_control";
 
     pub_goal_ = nh_.advertise<geometry_msgs::PoseStamped>("/command/pose", 1000);
     pub_cmd_vel_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
@@ -249,6 +249,43 @@ void DroneRace::generateTrajectory_() {
             if (fabs(states[i].velocity_W.x()) > epsilon || fabs(states[i].velocity_W.y()) > epsilon) {
                 double yaw_from_vel = atan2(states[i].velocity_W.y(), states[i].velocity_W.x());
                 goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
+            } else {
+                ROS_WARN("Velocity near zero at index %lu, setting goal_yaw to last valid yaw", i);
+                goal_.pose.orientation = goal_list_.empty() ? RPYToQuat(0, 0, 0) : goal_list_.back().pose.orientation;
+            }
+            goal_list_.push_back(goal_);
+
+            // Asignar la orientación calculada al goal_
+            //goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
+
+            // Añadir el goal a la lista
+            //goal_list_.push_back(goal_);
+
+            // Asignar las velocidades en el frame 'world'
+            goal_vel_.linear.x = states[i].velocity_W.x();
+            goal_vel_.linear.y = states[i].velocity_W.y();
+            goal_vel_.linear.z = states[i].velocity_W.z();
+            goal_vel_list_.push_back(goal_vel_);
+        }
+    }
+    else if (yaw_control == "RPY_control"){
+        for (size_t i = 0; i < states.size(); ++i) {
+            // Crear el PoseStamped en el frame 'world' directamente
+            goal_.header.frame_id = "world";
+            goal_.header.stamp = ros::Time::now();
+
+            // Asignar la posición de ground truth directamente desde states
+            goal_.pose.position.x = states[i].position_W.x();
+            goal_.pose.position.y = states[i].position_W.y();
+            goal_.pose.position.z = states[i].position_W.z();
+
+            // Calcular el yaw desde la velocidad en el frame 'world'
+            // double yaw_from_vel = atan2(states[i].velocity_W.y(), states[i].velocity_W.x());
+            const double epsilon = 1e-6;
+            if (fabs(states[i].velocity_W.x()) > epsilon || fabs(states[i].velocity_W.y()) > epsilon || fabs(states[i].velocity_W.z()) > epsilon) {
+                goal_.pose.orientation = calculateQuaternionFromVector(states[i].velocity_W.x(), 
+                                                                        states[i].velocity_W.y(), 
+                                                                        states[i].velocity_W.z());
             } else {
                 ROS_WARN("Velocity near zero at index %lu, setting goal_yaw to last valid yaw", i);
                 goal_.pose.orientation = goal_list_.empty() ? RPYToQuat(0, 0, 0) : goal_list_.back().pose.orientation;
