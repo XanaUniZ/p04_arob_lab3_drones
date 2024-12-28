@@ -29,6 +29,7 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     // yaw_control = "no_control";
     // yaw_control = "yaw_2D_vel";
     yaw_control = "RPY_control";
+    gate_counter = 0;
 
     pub_goal_ = nh_.advertise<geometry_msgs::PoseStamped>("/command/pose", 1000);
     pub_cmd_vel_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
@@ -123,6 +124,37 @@ void DroneRace::commandTimerCallback_(const ros::TimerEvent& event) {
 void DroneRace::dronePoseLogger(const nav_msgs::Odometry& odom_msg){
     if (!drone_finished) {
         gt_poses.push_back(odom_msg);
+
+        // Get the current position of the drone from the odometry message
+        double drone_x = odom_msg.pose.pose.position.x;
+        double drone_y = odom_msg.pose.pose.position.y;
+        double drone_z = odom_msg.pose.pose.position.z;
+
+        // Get the current objective gate
+        const geometry_msgs::Pose& gate_pose = gates_[gate_counter];
+        const geometry_msgs::Point& gate_position = gate_pose.position;
+
+        // Calculate the Euclidean distance to the gate
+        double distance_to_gate = std::sqrt(
+            std::pow(drone_x - gate_position.x, 2) +
+            std::pow(drone_y - gate_position.y, 2) +
+            std::pow(drone_z - gate_position.z, 2)
+        );
+
+        // Check if the drone has reached the current gate
+        double gate_threshold = 1.0; // Distance threshold to consider the gate reached
+        if (distance_to_gate < gate_threshold) {
+            // Increment the gate counter if it has not exceeded the total number of gates
+            if (gate_counter < gates_.size() - 1) {
+                gate_counter++;
+            } else {
+                // All gates have been reached, finish the race
+                gate_counter = -1;
+            }
+        }
+
+        // Add the current gate id to the objective_gates vector
+        objective_gates.push_back(gate_counter);
     }
 }
 

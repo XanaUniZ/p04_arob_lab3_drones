@@ -70,6 +70,8 @@ private:
 
     geometry_msgs::PoseStamped goal_;
     geometry_msgs::Twist goal_vel_;
+    std::vector<int> objective_gates;
+    int gate_counter;
 
     //Id markers
     int id_marker = 0;
