@@ -1,7 +1,56 @@
 #include "lab3_drones/drones_utils.hpp"
 #include <ros/ros.h>
 
+
 // #define M_PI 3.141592653589793238462643383279502884197
+
+struct CameraParams {
+    double focal_length; // Focal length of the camera in meters
+    double width;        // Image width in pixels
+    double height;       // Image height in pixels
+    double cx;           // Principal point x-coordinate (center of image)
+    double cy;           // Principal point y-coordinate (center of image)
+    double fov_x;        // Field of view in the x direction (radians)
+    double fov_y;        // Field of view in the y direction (radians)
+};
+
+bool isGateInsideCamera(const cv::Point2f& projected_point, const CameraParams& camera) {
+    // Check if the point is within the camera's image boundaries
+    return (projected_point.x >= 0 && projected_point.x <= camera.width &&
+            projected_point.y >= 0 && projected_point.y <= camera.height);
+}
+
+cv::Point2f projectGateToCamera(const geometry_msgs::Pose& gate_pose, const nav_msgs::Odometry& drone_odom, const CameraParams& camera) {
+    // Extract drone's position and orientation (transform the world to camera frame)
+    double drone_x = drone_odom.pose.pose.position.x;
+    double drone_y = drone_odom.pose.pose.position.y;
+    double drone_z = drone_odom.pose.pose.position.z;
+
+    // Gate's position in world frame
+    double gate_x = gate_pose.position.x;
+    double gate_y = gate_pose.position.y;
+    double gate_z = gate_pose.position.z;
+
+    // Camera's position relative to drone in the drone's local frame (assuming camera mounted forward)
+    // For simplicity, we assume the camera is at the drone's origin (0, 0, 0) in its local frame
+    // You can modify this based on actual camera position and orientation
+
+    // Calculate the relative position of the gate in the camera's frame
+    double rel_gate_x = gate_x - drone_x;
+    double rel_gate_y = gate_y - drone_y;
+    double rel_gate_z = gate_z - drone_z;
+
+    // Assuming camera is looking along the Z-axis (i.e., forward direction)
+    // Apply the camera's intrinsic parameters to project the point
+    double fx = camera.focal_length;  // Focal length in x-direction (camera focal length)
+    double fy = fx * (camera.height / camera.width);  // Focal length in y-direction based on aspect ratio
+
+    // Apply pinhole camera model projection
+    double u = fx * (rel_gate_x / rel_gate_z) + camera.cx;
+    double v = fy * (rel_gate_y / rel_gate_z) + camera.cy;
+
+    return cv::Point2f(u, v);  // Projected point in 2D image plane
+}
 
 geometry_msgs::Quaternion RPYToQuat(double roll, double pitch, double yaw) {
     tf2::Quaternion quaternion_tf2;
@@ -44,7 +93,9 @@ void calculateMetrics(
     const std::vector<nav_msgs::Odometry>& gt_poses,
     const std::vector<geometry_msgs::PoseStamped>& goal_list_,
     const std::vector<geometry_msgs::Twist>& goal_vel_list_,
-    std::string yaw_control)
+    std::string yaw_control,
+    std::vector<int> objective_gates,
+    std::vector<geometry_msgs::Pose> gates_)
 {
     if (gt_poses.empty()) {
         ROS_WARN("Ground truth is empty. Cannot compute metrics.");
@@ -61,6 +112,17 @@ void calculateMetrics(
     ROS_INFO("Calculating Metrics (use_orientation: %s)...", yaw_control);
     ROS_INFO("Ground Truth Size: %lu", gt_poses.size());
     ROS_INFO("Goal List Size: %lu", goal_list_.size());
+
+    CameraParams camera;
+    camera.focal_length = 1.0; // 1 meter focal length
+    camera.width = 1920;        // 1920 pixels wide
+    camera.height = 1080;       // 1080 pixels high
+    camera.cx = camera.width / 2;  // Principal point in the center of the image
+    camera.cy = camera.height / 2;
+    camera.fov_x = 90 * M_PI / 180.0;  // 90 degrees in radians
+    camera.fov_y = 60 * M_PI / 180.0;  // 60 degrees in radians
+    long int gate_visible = 0;
+    long int valid_gates = 0;
 
     for (std::size_t i = 0; i < gt_poses.size(); i++) {
         double lowest_dist = std::numeric_limits<double>::max();
@@ -152,6 +214,22 @@ void calculateMetrics(
             ROS_INFO("Angular Error: %.2f degrees", angular_error * 180 / M_PI);
             ROS_INFO("----------------------------------------------");
         }
+
+        if (objective_gates[i] != -1) {
+            cv::Point2f projected_point = projectGateToCamera(gates_[i], gt_poses[i], camera);
+
+            // Check if the gate is inside the camera's field of view
+            if (isGateInsideCamera(projected_point, camera)) {
+                // std::cout << "Gate is inside the camera's FOV at: (" 
+                //         << projected_point.x << ", " 
+                //         << projected_point.y << ")\n";
+                gate_visible++;
+            } else {
+                // std::cout << "Gate is outside the camera's FOV.\n";
+            }
+
+            valid_gates++;
+        }
     }
 
     // Compute mean and standard deviation for each metric
@@ -171,6 +249,9 @@ void calculateMetrics(
              mean_angular, mean_angular * 180 / M_PI, 
              std_dev_angular, std_dev_angular * 180 / M_PI);
     ROS_INFO("Velocity Errors - Mean: %.3f, Std Dev: %.3f", mean_velocity, std_dev_velocity);
+    ROS_INFO("Gate Visibles: %d ", gate_visible);
+    ROS_INFO("Valid Gates: %d ", valid_gates);
+    ROS_INFO("Gate Visibles Perc: %.3f ", (static_cast<float>(gate_visible) / static_cast<float>(valid_gates))*100);
 }
 
 double angularDistance(double angle1, double angle2) {

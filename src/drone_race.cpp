@@ -27,8 +27,8 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     is_pose_control_ = true;
 
     // yaw_control = "no_control";
-    // yaw_control = "yaw_2D_vel";
-    yaw_control = "RPY_control";
+    yaw_control = "yaw_2D_vel";
+    // yaw_control = "RPY_control";
     gate_counter = 0;
 
     pub_goal_ = nh_.advertise<geometry_msgs::PoseStamped>("/command/pose", 1000);
@@ -98,7 +98,7 @@ void DroneRace::commandTimerCallback_(const ros::TimerEvent& event) {
             timer_started_ = false; // Reset the timer for future runs
             drone_finished = true;
             // Calculate Metrics function
-            calculateMetrics(gt_poses, goal_list_, goal_vel_list_,yaw_control);
+            calculateMetrics(gt_poses, goal_list_, goal_vel_list_,yaw_control, objective_gates, gates_);
         }
 
         ros::shutdown(); // End the program

@@ -40,12 +40,16 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
+# Add this line at the beginning of your CMakeLists.txt
+find_package(OpenCV REQUIRED)
+
 ## Add library for utils.cpp
 add_library(lab3_utils
     src/drones_utils.cpp
 )
 target_link_libraries(lab3_utils
     ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
     Eigen3::Eigen
 )
 

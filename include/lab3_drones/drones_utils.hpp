@@ -11,6 +11,7 @@
 #include <nav_msgs/Odometry.h>
 #include <numeric>  // Para std::accumulate y std::inner_product
 #include <tf2/utils.h>  // Para tf2::getYaw
+#include <opencv2/opencv.hpp> 
 
 geometry_msgs::Quaternion RPYToQuat(double roll, double pitch, double yaw);
 Eigen::Matrix<double, 3, 3> quatToRMatrix(const geometry_msgs::Quaternion& quat);
@@ -21,7 +22,8 @@ void calculateMetrics(
     const std::vector<nav_msgs::Odometry>& gt_poses,
     const std::vector<geometry_msgs::PoseStamped>& goal_list_,
     const std::vector<geometry_msgs::Twist>& goal_vel_list_,
-    std::string yaw_control);
+    std::string yaw_control, std::vector<int> objective_gates,
+    std::vector<geometry_msgs::Pose> gates_);
 
 Eigen::Vector3d extractOrientationAsRPY(const geometry_msgs::PoseStamped& pose_stamped);
 double angularDistance(double angle1, double angle2);
@@ -29,5 +31,9 @@ double normalizeAngle(double angle);
 
 void normalizeVector(double& x, double& y, double& z);
 geometry_msgs::Quaternion calculateQuaternionFromVector(double x, double y, double z);
+
+struct CameraParams;
+bool isGateInsideCamera(const cv::Point2f& projected_point, const CameraParams& camera);
+cv::Point2f projectGateToCamera(const geometry_msgs::Pose& gate_pose, const nav_msgs::Odometry& drone_odom, const CameraParams& camera);
 
 #endif // UTILS_HPP
