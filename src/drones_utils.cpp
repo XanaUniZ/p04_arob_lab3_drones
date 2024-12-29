@@ -229,6 +229,7 @@ void calculateMetrics(
             }
 
             valid_gates++;
+            
         }
     }
 
