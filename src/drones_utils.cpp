@@ -171,7 +171,7 @@ void calculateMetrics(
             goal_yaw_no_ori = atan2(goal_vel_list_[index].linear.y, goal_vel_list_[index].linear.x);
             goal_yaw = goal_yaw_no_ori;
         }
-        else if ((yaw_control == "yaw_2D_vel") || (yaw_control == "RPY_control")){
+        else if ((yaw_control == "yaw_2D_vel") || (yaw_control == "RPY_control") || (yaw_control == "next_gate")){
             goal_yaw_ori = tf2::getYaw(goal_list_[index].pose.orientation);
 
 

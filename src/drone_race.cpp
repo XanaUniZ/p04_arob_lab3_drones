@@ -26,8 +26,14 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     // This variable will control if we are in pose or cmd_vel control mode
     is_pose_control_ = true;
 
+    if (!nh_.getParam("yaw_control", yaw_control))
+    {
+        ROS_WARN("There is no 'yaw_control' parameter. Using default value.");
+        yaw_control = "no_control";
+
+    }
     // yaw_control = "no_control";
-    yaw_control = "yaw_2D_vel";
+    // yaw_control = "yaw_2D_vel";
     // yaw_control = "RPY_control";
     gate_counter = 0;
 
@@ -287,12 +293,6 @@ void DroneRace::generateTrajectory_() {
             }
             goal_list_.push_back(goal_);
 
-            // Asignar la orientación calculada al goal_
-            //goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
-
-            // Añadir el goal a la lista
-            //goal_list_.push_back(goal_);
-
             // Asignar las velocidades en el frame 'world'
             goal_vel_.linear.x = states[i].velocity_W.x();
             goal_vel_.linear.y = states[i].velocity_W.y();
@@ -324,12 +324,6 @@ void DroneRace::generateTrajectory_() {
             }
             goal_list_.push_back(goal_);
 
-            // Asignar la orientación calculada al goal_
-            //goal_.pose.orientation = RPYToQuat(0, 0, yaw_from_vel);
-
-            // Añadir el goal a la lista
-            //goal_list_.push_back(goal_);
-
             // Asignar las velocidades en el frame 'world'
             goal_vel_.linear.x = states[i].velocity_W.x();
             goal_vel_.linear.y = states[i].velocity_W.y();
@@ -337,7 +331,49 @@ void DroneRace::generateTrajectory_() {
             goal_vel_list_.push_back(goal_vel_);
         }
     }
+    else if (yaw_control == "next_gate"){
+        int goal_gate = 0;
+        for (size_t i = 0; i < states.size(); ++i) {
+            goal_.header.frame_id = "world";
+            goal_.header.stamp = ros::Time::now();
+            goal_.pose.position.x = states[i].position_W.x();
+            goal_.pose.position.y = states[i].position_W.y();
+            goal_.pose.position.z = states[i].position_W.z();
+
+            // Compute orientation based on the direction vector
+            double yaw = 0.0;
+            // Get the current objective gate
+            const geometry_msgs::Point& gate_position = gates_[goal_gate].position;
+
+            // Calculate the Euclidean distance to the gate
+            double distance_to_gate = std::sqrt(
+                std::pow(states[i].position_W.x() - gate_position.x, 2) +
+                std::pow(states[i].position_W.y() - gate_position.y, 2) +
+                std::pow(states[i].position_W.z() - gate_position.z, 2)
+            );
+
+            // Check if the drone has reached the current gate
+            double gate_threshold = 1.0; // Distance threshold to consider the gate reached
+            if (distance_to_gate < gate_threshold) {
+                goal_gate = (goal_gate + 1) % gates_.size();
+            }
+            Eigen::Vector3d eigen_gate = Eigen::Vector3d(gate_position.x, gate_position.y, gate_position.z);
+            Eigen::Vector3d direction = eigen_gate - states[i].position_W;
+            yaw = atan2(direction.y(), direction.x());
+
+            // Convert yaw to quaternion and assign orientation
+            goal_.pose.orientation = RPYToQuat(0, 0, yaw);
+
+            goal_list_.push_back(goal_);
+
+            goal_vel_.linear.x = states[i].velocity_W.x();
+            goal_vel_.linear.y = states[i].velocity_W.y();
+            goal_vel_.linear.z = states[i].velocity_W.z();
+            goal_vel_list_.push_back(goal_vel_);
+        }
+    }
     else{
-        ROS_ERROR("Invalid yaw contol mode: %s Aborting!", yaw_control);
+        ROS_ERROR("Invalid yaw contol mode: %s Aborting!", yaw_control.c_str());
+        return;
     }
 }
