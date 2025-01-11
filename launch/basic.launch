@@ -13,9 +13,10 @@
     <!-- Trajectory node   -->
     <node pkg="lab3_drones" type="drone_race" name="drone_race" output="screen"> 
 
-        <param name="targets_file_path"           value="/home/arob/catkin_ws/src/p04_arob_lab3_drones/data/gates.txt"/>
-        <param name="yaw_control"           value="no_control"/>
-        <!-- <param name="yaw_control"           value="yaw_2D_vel"/> -->
+        <param name="targets_file_path"           value="/home/arob/catkin_ws/src/p04_arob_lab3_drones/data/gates_hard.txt"/>
+        <!-- <param name="targets_file_path"           value="/home/arob/catkin_ws/src/p04_arob_lab3_drones/data/gates.txt"/> -->
+        <!-- <param name="yaw_control"           value="no_control"/> -->
+        <param name="yaw_control"           value="yaw_2D_vel"/>
         <!-- <param name="yaw_control"           value="RPY_control"/> -->
         <!-- <param name="yaw_control"           value="next_gate"/> -->
 

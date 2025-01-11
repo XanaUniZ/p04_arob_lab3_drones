@@ -16,29 +16,63 @@ struct CameraParams {
 
 bool isGateInsideCamera(const cv::Point2f& projected_point, const CameraParams& camera) {
     // Check if the point is within the camera's image boundaries
-    return (projected_point.x >= 0 && projected_point.x <= camera.width &&
-            projected_point.y >= 0 && projected_point.y <= camera.height);
+    return ((projected_point.x >= 0) && (projected_point.x <= camera.width) &&
+            (projected_point.y >= 0) && (projected_point.y <= camera.height));
+}
+
+
+tf2::Matrix3x3 getCameraRotation() {
+    // Define the fixed rotation: Transform from drone frame to camera frame
+    tf2::Matrix3x3 rotation_matrix;
+    rotation_matrix.setValue( 0,  1,  0,  // Drone X -> Camera Z
+                              0,  0, -1,  // Drone Y -> Camera X
+                              1,  0,  0); // Drone Z -> Camera -Y
+
+    // rotation_matrix.setValue( 0,  0,  1,  // Drone X -> Camera Z
+    //                           1,  0, 0,  // Drone Y -> Camera X
+    //                           0,  -1,  0); // Drone Z -> Camera -Y
+    return rotation_matrix;
 }
 
 cv::Point2f projectGateToCamera(const geometry_msgs::Pose& gate_pose, const nav_msgs::Odometry& drone_odom, const CameraParams& camera) {
-    // Extract drone's position and orientation (transform the world to camera frame)
+    // Extract drone's position
     double drone_x = drone_odom.pose.pose.position.x;
     double drone_y = drone_odom.pose.pose.position.y;
     double drone_z = drone_odom.pose.pose.position.z;
 
+    // Extract drone's orientation (quaternion)
+    double qx = drone_odom.pose.pose.orientation.x;
+    double qy = drone_odom.pose.pose.orientation.y;
+    double qz = drone_odom.pose.pose.orientation.z;
+    double qw = drone_odom.pose.pose.orientation.w;
+
+    // Create quaternion and transform matrix
+    tf2::Quaternion drone_orientation(qx, qy, qz, qw);
+    tf2::Matrix3x3 drone_orientation_mat(drone_orientation);
+    tf2::Matrix3x3 camera_fixed_rotation = getCameraRotation();
+    tf2::Matrix3x3 rotation_matrix = drone_orientation_mat * camera_fixed_rotation;
+
     // Gate's position in world frame
-    double gate_x = gate_pose.position.x;
-    double gate_y = gate_pose.position.y;
-    double gate_z = gate_pose.position.z;
+    tf2::Vector3 gate_world_pos(gate_pose.position.x, gate_pose.position.y, gate_pose.position.z);
 
-    // Camera's position relative to drone in the drone's local frame (assuming camera mounted forward)
-    // For simplicity, we assume the camera is at the drone's origin (0, 0, 0) in its local frame
-    // You can modify this based on actual camera position and orientation
+    // Drone's position in world frame
+    tf2::Vector3 drone_world_pos(drone_x, drone_y, drone_z);
 
-    // Calculate the relative position of the gate in the camera's frame
-    double rel_gate_x = gate_x - drone_x;
-    double rel_gate_y = gate_y - drone_y;
-    double rel_gate_z = gate_z - drone_z;
+    // Relative position of the gate in the world frame
+    tf2::Vector3 gate_camera_frame = rotation_matrix.transpose()*gate_world_pos - (rotation_matrix.transpose()*drone_world_pos);
+
+    // Transform the relative position into the camera (local drone) frame
+    // tf2::Vector3 gate_camera_frame = rotation_matrix.transpose() * relative_pos - ;
+
+    // Camera frame convention: assuming camera looks along the +Z axis
+    double rel_gate_x = gate_camera_frame.x();
+    double rel_gate_y = gate_camera_frame.y();
+    double rel_gate_z = gate_camera_frame.z();
+
+    // Check if gate is behind the camera
+    if (rel_gate_z <= 0) {
+        return cv::Point2f(-1, -1);  // Invalid point; gate is not visible
+    }
 
     // Assuming camera is looking along the Z-axis (i.e., forward direction)
     // Apply the camera's intrinsic parameters to project the point
