@@ -7,6 +7,8 @@ Inside the "drone_race" you can change the desired circuit by changing the "targ
 <param name="targets_file_path"           value="/home/arob/catkin_ws/src/p04_arob_lab3_drones/data/gates.txt"/>
 or
 <param name="targets_file_path"           value="/home/arob/catkin_ws/src/p04_arob_lab3_drones/data/gates_hard.txt"/>
+or
+param name="targets_file_path"           value="/home/arob/catkin_ws/src/p04_arob_lab3_drones/data/gates_harder.txt"/>
 
 Also in that node you can choose the kind of yaw control used by changing the "yaw_control" argument. You can choose between the following: 
 <param name="yaw_control"           value="no_control"/>

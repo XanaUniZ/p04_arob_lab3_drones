@@ -38,7 +38,7 @@ DroneRace::DroneRace(ros::NodeHandle nh) : nh_(nh),timer_started_(false)
     gate_counter = 0;
 
     pub_goal_ = nh_.advertise<geometry_msgs::PoseStamped>("/command/pose", 1000);
-    pub_cmd_vel_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+    // pub_cmd_vel_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
     // create publisher for RVIZ markers
     pub_traj_markers_ =
@@ -121,7 +121,7 @@ void DroneRace::commandTimerCallback_(const ros::TimerEvent& event) {
     if (is_pose_control_) {
         pub_goal_.publish(goal_list_[current_goal_idx_]);
     } else {
-        pub_cmd_vel_.publish(goal_vel_list_[current_goal_idx_]);
+        // pub_cmd_vel_.publish(goal_vel_list_[current_goal_idx_]);
     }
     current_goal_idx_++;
 }
